@@ -64,43 +64,77 @@ public class VoteForLinkReminder {
 	private static final String VOTE_FOR_ME_KEY = "voteForMe";
 
 	private static final int endMonth = 9;
-	private static final int endDay = 1;
+	private static final int endDay = 3;
+
+	private static final String TIME_CONFIG_HELP = "For Example, if you want to get reminded on every day at 10:10 AM. Give minute as 10 and hour as 10";
 
 	// private static final String CLICKS = "clicks";
 
 	private static boolean populateUserDetails = true;
-	private static boolean voteForMe;
+	private static boolean voteForMe = false;
 
 	private static Logger logger = LoggerFactory
 			.getLogger(VoteForLinkReminder.class);
 
 	public static void main(String[] args) {
-		// startVotingChrome();
-		String startVote = System.getProperty("startVote");
-		if ("true".equalsIgnoreCase(startVote)) {
+		Calendar calendarNow = Calendar.getInstance();
+		Calendar endCalendar = Calendar.getInstance();
+		endCalendar.set(Calendar.DAY_OF_MONTH, endDay);
+		endCalendar.set(Calendar.MONTH, endMonth);
+		endCalendar.set(Calendar.HOUR_OF_DAY, 0);
+		endCalendar.set(Calendar.MINUTE, 0);
+		endCalendar.set(Calendar.SECOND, 0);
+		logger.info("Voting Date = " + calendarNow.getTime());
+		logger.info("Configured Voting End Date = " + endCalendar.getTime());
 
-			Calendar calendarNow = Calendar.getInstance();
-			Calendar endCalendar = Calendar.getInstance();
-			endCalendar.set(Calendar.DAY_OF_MONTH, endDay);
-			endCalendar.set(Calendar.MONTH, endMonth);
-			// if (calendarNow.before(endCalendar)) {
-			populateUserCredentialsFromPropertyFile();
-			startVoting();
-			// } else {
-			logger.info("Voting ended");
-			// Voting is done. Delete application.
-			// }
+		if (calendarNow.before(endCalendar)) {
+			String startVote = System.getProperty("startVote");
+			if ("true".equalsIgnoreCase(startVote)) {
+				logger.info("Going to vote on " + calendarNow.getTime());
+				populateUserCredentialsFromPropertyFile();
+				startVoting();
+			} else {
+				getUserDetails();
+			}
 		} else {
-			getUserDetails();
+			logger.info("**** Voting ended ****");
+			endVoting();
 		}
 	}
 
+	private static void endVoting() {
+
+		String command = "crontab -r";
+		ProcessBuilder pb = new ProcessBuilder("sh", "-c", command);
+		try {
+			pb.start();
+		} catch (IOException e) {
+			logger.error("", e);
+		}
+		try {
+			File getVoteForLinkHomeLocation = new File(
+					getVoteForLinkHomeLocation());
+			if (getVoteForLinkHomeLocation.exists()) {
+				deleteDir(getVoteForLinkHomeLocation);
+			}
+		} catch (Exception ex) {
+			logger.error("", ex);
+		}
+		JOptionPane.showMessageDialog(null, "Link Voting Ended. Thank you!.");
+	}
+
+	private static void deleteDir(File file) {
+		File[] contents = file.listFiles();
+		if (contents != null) {
+			for (File f : contents) {
+				deleteDir(f);
+			}
+		}
+		file.delete();
+	}
+
 	private static void populateUserCredentialsFromPropertyFile() {
-		String userHomeDirectory = System.getProperty("user.home");
-		File configFilePath = new File(userHomeDirectory + "/" + APPNAME + "/"
-				+ CONFIG_FILE);
-		// Path configFilePath = Paths
-		// .get(userHomeDirectory, APPNAME, CONFIG_FILE);
+		File configFilePath = new File(getConfigFileLocation());
 		Properties properties = new Properties();
 		try {
 			properties.load(new FileReader(configFilePath));
@@ -109,37 +143,50 @@ public class VoteForLinkReminder {
 
 			String populateUserDetailsString = properties
 					.getProperty(POPULATE_DETAILS_KEY);
-			String voteForMeString = properties.getProperty(VOTE_FOR_ME_KEY);
+			// String voteForMeString = properties.getProperty(VOTE_FOR_ME_KEY);
 
 			populateUserDetails = Boolean
 					.parseBoolean(populateUserDetailsString);
-			voteForMe = Boolean.parseBoolean(voteForMeString);
+			// voteForMe = Boolean.parseBoolean(voteForMeString);
 
 		} catch (IOException e) {
 			logger.error("", e);
 		}
 	}
 
-	private static void setUpCronJob() {
+	private static String getVoteForLinkHomeLocation() {
+		return getUserHomeDirectory() + "/" + APPNAME;
+	}
+
+	private static String getConfigFileLocation() {
+		return getVoteForLinkHomeLocation() + "/" + CONFIG_FILE;
+	}
+
+	private static String getUserHomeDirectory() {
 		String userHomeDirectory = System.getProperty("user.home");
-		// Path jarPath = Paths.get(userHomeDirectory, APPNAME, JAR_NAME);
-		File jarPath = new File(userHomeDirectory + "/" + APPNAME + "/"
-				+ JAR_NAME);
+		return userHomeDirectory;
+	}
+
+	private static void setUpCronJob() {
+		String userHomeDirectory = getUserHomeDirectory();
+		File jarPath = new File(getJarInstallationLocation());
 
 		if (null == minutes) {
-			minutes = "*/2";
+			minutes = "10";
 		}
 		if (hour == null) {
-			hour = "*";
+			hour = "10";
 		}
 
+		minutes = minutes.trim();
+		hour = hour.trim();
+
 		String exp = minutes + " " + hour
-				+ " * * * java -DstartVote=true -jar "
+				+ " * 7,8,9 * java -DstartVote=true -jar "
 				+ jarPath.getAbsolutePath() + "\n";
 
 		byte[] expByte = exp.getBytes();
 
-		// Path path = Paths.get(userHomeDirectory, APPNAME, CRON_FILE);
 		File path = new File(userHomeDirectory + "/" + APPNAME + "/"
 				+ CRON_FILE);
 		OutputStream out = null;
@@ -165,9 +212,12 @@ public class VoteForLinkReminder {
 		}
 	}
 
+	private static String getJarInstallationLocation() {
+		return getVoteForLinkHomeLocation() + "/" + JAR_NAME;
+	}
+
 	public static void createVotingHomeDirectory() {
-		String userHomeDirectory = System.getProperty("user.home");
-		// Path userHomeDirectoryPath = Paths.get(userHomeDirectory, APPNAME);
+		String userHomeDirectory = getUserHomeDirectory();
 
 		try {
 			File userHomeDirectoryPath = new File(userHomeDirectory + "/"
@@ -179,23 +229,13 @@ public class VoteForLinkReminder {
 	}
 
 	public static void createConfigFile() {
-		String userHomeDirectory = System.getProperty("user.home");
 
-		File file = new File(userHomeDirectory + "/" + APPNAME + "/"
-				+ CONFIG_FILE);
+		File file = new File(getConfigFileLocation());
 		try {
 			file.createNewFile();
 		} catch (Exception e1) {
 			logger.error("", e1);
 		}
-		// try {
-		// path = Files.createFile(path);
-		//
-		// } catch (FileAlreadyExistsException ex) {
-		// ex.printStackTrace();
-		// } catch (IOException e) {
-		// e.printStackTrace();
-		// }
 		OutputStream out = null;
 		try {
 			out = new BufferedOutputStream(new FileOutputStream(file));
@@ -224,21 +264,13 @@ public class VoteForLinkReminder {
 	}
 
 	public static void setupAndCopyInstallation() {
-		String userHomeDirectory = System.getProperty("user.home");
-		// File userHomeDirectoryPath = new File(userHomeDirectory + "/" +
-		// APPNAME);
-		// try {
-		// userHomeDirectoryPath.mkdir();
-		// } catch (Exception e1) {
-		// logger.error("", e1);
-		// }
 
 		String currentRelativePath = new File("").getAbsolutePath();
 		logger.info("Current relative path is: " + currentRelativePath);
 
 		File source = new File(currentRelativePath + "/" + JAR_NAME);
 
-		File dest = new File(userHomeDirectory + "/" + APPNAME + "/" + JAR_NAME);
+		File dest = new File(getJarInstallationLocation());
 		try {
 			dest.createNewFile();
 			copyFileUsingStream(source, dest);
@@ -270,32 +302,35 @@ public class VoteForLinkReminder {
 		final JFrame f = new JFrame(heading);
 		f.setTitle(heading);
 
-		JPanel p1 = new JPanel();
-		p1.setBackground(Color.white);
 		GridLayout gridLayout = new GridLayout(6, 2, 5, 5);
+		JPanel p1 = new JPanel(gridLayout);
+		p1.setBackground(Color.WHITE);
 		Border border = new LineBorder(Color.LIGHT_GRAY, 10);
 
 		Border margin = new EmptyBorder(30, 30, 30, 30);
 		p1.setBorder(new CompoundBorder(border, margin));
 
-		JLabel lblName = new JLabel("User name :");
-		JLabel lblEmail = new JLabel("Email :");
+		JLabel lblContact = new JLabel(
+				"Contact Us : Jinto_Kuriakose@intuit.com");
+
+		JLabel lblName = new JLabel("Your Name :");
+		JLabel lblEmail = new JLabel("Your Email :");
 
 		JLabel lblMinute = new JLabel("Minutes (0-59) :");
-		JLabel lblHour = new JLabel("Hour (0-24) :");
+		JLabel lblHour = new JLabel("Hour (0-23) :");
+
 		// JLabel lblAutoPopulate = new JLabel("Auto populate my details :");
-		JLabel lblVoteForMe = new JLabel("Automatically Vote For Me :");
+		// JLabel lblVoteForMe = new JLabel("Automatically Vote For Me :");
 
 		final JTextField userNameField = new JTextField();
 		final JTextField emailField = new JTextField();
 		final JTextField jFieldMinute = new JTextField();
+		jFieldMinute.setToolTipText(TIME_CONFIG_HELP);
 		final JTextField jFieldHour = new JTextField();
-
+		jFieldHour.setToolTipText(TIME_CONFIG_HELP);
 		// final JCheckBox populateUserDetailsCheck = new JCheckBox();
-		final JCheckBox voteForMeCheck = new JCheckBox();
-		//voteForMeCheck.setSelected(true);
-
-		p1.setLayout(gridLayout);
+		// final JCheckBox voteForMeCheck = new JCheckBox();
+		// voteForMeCheck.setSelected(true);
 
 		p1.add(lblName);
 		p1.add(userNameField);
@@ -309,11 +344,13 @@ public class VoteForLinkReminder {
 		p1.add(lblHour);
 		p1.add(jFieldHour);
 
-		p1.add(lblVoteForMe);
-		p1.add(voteForMeCheck);
+		// p1.add(lblVoteForMe);
+		// p1.add(voteForMeCheck);
 
 		JButton button = new JButton();
 		button.setText("Submit");
+		button.setBorderPainted(true);
+		button.setBackground(Color.BLUE);
 		button.addActionListener(new ActionListener() {
 
 			public void actionPerformed(ActionEvent e) {
@@ -322,15 +359,16 @@ public class VoteForLinkReminder {
 				// populateUserDetails = populateUserDetailsCheck.isSelected();
 				minutes = jFieldMinute.getText();
 				hour = jFieldHour.getText();
-				voteForMe = voteForMeCheck.isSelected();
+				// voteForMe = voteForMeCheck.isSelected();
 
 				try {
 					createVotingHomeDirectory();
 					createConfigFile();
 					setupAndCopyInstallation();
 					setUpCronJob();
-					JOptionPane.showMessageDialog(null,
-							"Vote For Reminder installed Successfully");
+					JOptionPane
+							.showMessageDialog(null,
+									"Successfully Installed Link Vote Reminder. Thank you!");
 				} catch (Exception ex) {
 					logger.error("", ex);
 					JOptionPane.showMessageDialog(null, ex.getMessage());
@@ -338,12 +376,55 @@ public class VoteForLinkReminder {
 				f.dispose();
 			}
 		});
+
+		final JTextField jFieldHidden = new JTextField();
+		jFieldHidden.setVisible(false);
+		p1.add(jFieldHidden);
 		p1.add(button);
+
+		p1.add(lblContact);
+
 		f.add(p1);
 		f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		f.setSize(500, 500);
+		f.setSize(600, 500);
 		f.setLocationRelativeTo(null);
 		f.setVisible(true);
+	}
+
+	public static void startVoting() {
+
+		FirefoxDriver driver = new FirefoxDriver();
+		driver.manage().window().maximize();
+		driver.get("http://www.sleeter.com/awesomeapps/2016/intuit-link");
+		if (populateUserDetails) {
+			List<WebElement> login = driver
+					.findElementsByXPath("//button[@data-toggle='modal'][@data-target='#awesome-82']");
+			login.get(0).click();
+
+			List<WebElement> nameElement = driver
+					.findElementsByXPath("//input[@name='first_name']");
+
+			new WebDriverWait(driver, 4).until(ExpectedConditions
+					.visibilityOf(nameElement.get(0)));
+
+			nameElement.get(0).sendKeys(userName);
+
+			List<WebElement> emailElement = driver
+					.findElementsByXPath("//input[@name='email']");
+			emailElement.get(0).sendKeys(emailId);
+
+			if (voteForMe) {
+				List<WebElement> login2 = driver
+						.findElementsByXPath("//button[@style='cursor: pointer;']");
+				login2.get(0).click();
+				try {
+					Thread.sleep(10000);
+				} catch (InterruptedException e) {
+					logger.error("", e);
+				}
+				driver.close();
+			}
+		}
 	}
 
 	public static void startVotingChrome() {
@@ -389,38 +470,4 @@ public class VoteForLinkReminder {
 		}
 	}
 
-	public static void startVoting() {
-
-		FirefoxDriver driver = new FirefoxDriver();
-		driver.get("http://www.sleeter.com/awesomeapps/2016/intuit-link");
-		if (populateUserDetails) {
-			List<WebElement> login = driver
-					.findElementsByXPath("//button[@data-toggle='modal'][@data-target='#awesome-82']");
-			login.get(0).click();
-
-			List<WebElement> nameElement = driver
-					.findElementsByXPath("//input[@name='first_name']");
-
-			new WebDriverWait(driver, 10).until(ExpectedConditions
-					.visibilityOf(nameElement.get(0)));
-
-			nameElement.get(0).sendKeys(userName);
-
-			List<WebElement> emailElement = driver
-					.findElementsByXPath("//input[@name='email']");
-			emailElement.get(0).sendKeys(emailId);
-
-			if (voteForMe) {
-				List<WebElement> login2 = driver
-						.findElementsByXPath("//button[@style='cursor: pointer;']");
-				login2.get(0).click();
-				try {
-					Thread.sleep(10000);
-				} catch (InterruptedException e) {
-					logger.error("", e);
-				}
-				driver.close();
-			}
-		}
-	}
 }
