@@ -3,24 +3,18 @@
  */
 package com.test.votelink;
 
-import static java.nio.file.StandardOpenOption.CREATE;
-import static java.nio.file.StandardOpenOption.READ;
-import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
-
 import java.awt.Color;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.List;
@@ -103,11 +97,13 @@ public class VoteForLinkReminder {
 
 	private static void populateUserCredentialsFromPropertyFile() {
 		String userHomeDirectory = System.getProperty("user.home");
-		Path configFilePath = Paths
-				.get(userHomeDirectory, APPNAME, CONFIG_FILE);
+		File configFilePath = new File(userHomeDirectory + "/" + APPNAME + "/"
+				+ CONFIG_FILE);
+		// Path configFilePath = Paths
+		// .get(userHomeDirectory, APPNAME, CONFIG_FILE);
 		Properties properties = new Properties();
 		try {
-			properties.load(Files.newInputStream(configFilePath, READ));
+			properties.load(new FileReader(configFilePath));
 			userName = properties.getProperty(USERNAME_KEY);
 			emailId = properties.getProperty(EMAIL_KEY);
 
@@ -126,7 +122,9 @@ public class VoteForLinkReminder {
 
 	private static void setUpCronJob() {
 		String userHomeDirectory = System.getProperty("user.home");
-		Path jarPath = Paths.get(userHomeDirectory, APPNAME, JAR_NAME);
+		// Path jarPath = Paths.get(userHomeDirectory, APPNAME, JAR_NAME);
+		File jarPath = new File(userHomeDirectory + "/" + APPNAME + "/"
+				+ JAR_NAME);
 
 		if (null == minutes) {
 			minutes = "*/2";
@@ -137,15 +135,16 @@ public class VoteForLinkReminder {
 
 		String exp = minutes + " " + hour
 				+ " * * * java -DstartVote=true -jar "
-				+ jarPath.toAbsolutePath() + "\n";
+				+ jarPath.getAbsolutePath() + "\n";
 
 		byte[] expByte = exp.getBytes();
 
-		Path path = Paths.get(userHomeDirectory, APPNAME, CRON_FILE);
+		// Path path = Paths.get(userHomeDirectory, APPNAME, CRON_FILE);
+		File path = new File(userHomeDirectory + "/" + APPNAME + "/"
+				+ CRON_FILE);
 		OutputStream out = null;
 		try {
-			out = new BufferedOutputStream(Files.newOutputStream(path, CREATE,
-					TRUNCATE_EXISTING));
+			out = new BufferedOutputStream(new FileOutputStream(path));
 			out.write(expByte, 0, expByte.length);
 		} catch (Exception ex) {
 			logger.error("", ex);
@@ -157,8 +156,7 @@ public class VoteForLinkReminder {
 					e.printStackTrace();
 				}
 		}
-
-		String command = "crontab " + path.toAbsolutePath().toString();
+		String command = "crontab " + path.getAbsolutePath().toString();
 		ProcessBuilder pb = new ProcessBuilder("sh", "-c", command);
 		try {
 			pb.start();
@@ -169,11 +167,13 @@ public class VoteForLinkReminder {
 
 	public static void createVotingHomeDirectory() {
 		String userHomeDirectory = System.getProperty("user.home");
-		Path userHomeDirectoryPath = Paths.get(userHomeDirectory, APPNAME);
+		// Path userHomeDirectoryPath = Paths.get(userHomeDirectory, APPNAME);
+
 		try {
-			userHomeDirectoryPath = Files
-					.createDirectory(userHomeDirectoryPath);
-		} catch (IOException e1) {
+			File userHomeDirectoryPath = new File(userHomeDirectory + "/"
+					+ APPNAME);
+			userHomeDirectoryPath.mkdir();
+		} catch (Exception e1) {
 			logger.error("", e1);
 		}
 	}
@@ -181,9 +181,10 @@ public class VoteForLinkReminder {
 	public static void createConfigFile() {
 		String userHomeDirectory = System.getProperty("user.home");
 
-		Path path = Paths.get(userHomeDirectory, APPNAME, CONFIG_FILE);
+		File file = new File(userHomeDirectory + "/" + APPNAME + "/"
+				+ CONFIG_FILE);
 		try {
-			new File(path.toAbsolutePath().toString()).createNewFile();
+			file.createNewFile();
 		} catch (Exception e1) {
 			logger.error("", e1);
 		}
@@ -197,9 +198,7 @@ public class VoteForLinkReminder {
 		// }
 		OutputStream out = null;
 		try {
-			out = new BufferedOutputStream(Files.newOutputStream(path,
-					StandardOpenOption.CREATE, StandardOpenOption.WRITE,
-					TRUNCATE_EXISTING));
+			out = new BufferedOutputStream(new FileOutputStream(file));
 			StringBuilder builder = new StringBuilder();
 			builder.append(USERNAME_KEY).append("=").append(userName)
 					.append("\n");
@@ -226,28 +225,43 @@ public class VoteForLinkReminder {
 
 	public static void setupAndCopyInstallation() {
 		String userHomeDirectory = System.getProperty("user.home");
-		Path userHomeDirectoryPath = Paths.get(userHomeDirectory, APPNAME);
+		// File userHomeDirectoryPath = new File(userHomeDirectory + "/" +
+		// APPNAME);
+		// try {
+		// userHomeDirectoryPath.mkdir();
+		// } catch (Exception e1) {
+		// logger.error("", e1);
+		// }
 
+		String currentRelativePath = new File("").getAbsolutePath();
+		logger.info("Current relative path is: " + currentRelativePath);
+
+		File source = new File(currentRelativePath + "/" + JAR_NAME);
+
+		File dest = new File(userHomeDirectory + "/" + APPNAME + "/" + JAR_NAME);
 		try {
-			userHomeDirectoryPath = Files
-					.createDirectory(userHomeDirectoryPath);
-		} catch (IOException e1) {
-			logger.error("", e1);
-		}
-
-		Path currentRelativePath = Paths.get("");
-		String s = currentRelativePath.toAbsolutePath().toString();
-		logger.info("Current relative path is: " + s);
-
-		Path sourcePath = FileSystems.getDefault().getPath(
-				currentRelativePath.toAbsolutePath().toString(), JAR_NAME);
-		Path destinationPath = FileSystems.getDefault().getPath(
-				userHomeDirectory + "/" + APPNAME, JAR_NAME);
-		try {
-			Files.copy(sourcePath, destinationPath,
-					StandardCopyOption.REPLACE_EXISTING);
-		} catch (IOException e) {
+			dest.createNewFile();
+			copyFileUsingStream(source, dest);
+		} catch (Exception e) {
 			logger.error("", e);
+		}
+	}
+
+	private static void copyFileUsingStream(File source, File dest)
+			throws IOException {
+		InputStream is = null;
+		OutputStream os = null;
+		try {
+			is = new FileInputStream(source);
+			os = new FileOutputStream(dest);
+			byte[] buffer = new byte[1024];
+			int length;
+			while ((length = is.read(buffer)) > 0) {
+				os.write(buffer, 0, length);
+			}
+		} finally {
+			is.close();
+			os.close();
 		}
 	}
 
@@ -279,7 +293,7 @@ public class VoteForLinkReminder {
 
 		// final JCheckBox populateUserDetailsCheck = new JCheckBox();
 		final JCheckBox voteForMeCheck = new JCheckBox();
-		voteForMeCheck.setSelected(true);
+		//voteForMeCheck.setSelected(true);
 
 		p1.setLayout(gridLayout);
 
